@@ -3,8 +3,8 @@ package com.redhat.processor.container.kafka;
 import com.redhat.processor.annotations.HandleMessage;
 import com.redhat.processor.annotations.OutputType;
 import com.redhat.processor.container.ContainerUtils;
-import com.redhat.processor.container.MessageHandler;
-import com.redhat.processor.container.MessageHandlerContainer;
+import com.redhat.processor.container.MessageProcessorHandler;
+import com.redhat.processor.container.MessageProcessorHandlerContainer;
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.Properties;
@@ -31,8 +31,8 @@ import org.apache.kafka.common.serialization.LongSerializer;
  * This class handles messages for a single stream in a processor class
  * @author hhiden
  */
-public class KafkaMessageHandler extends MessageHandler implements Runnable {
-    private static final Logger logger = Logger.getLogger(KafkaMessageHandler.class.getName());
+public class KafkaMessageProcessorHandler extends MessageProcessorHandler implements Runnable {
+    private static final Logger logger = Logger.getLogger(KafkaMessageProcessorHandler.class.getName());
     
     private final boolean outputStreamPresent;
     private final String outputStreamName;
@@ -45,13 +45,10 @@ public class KafkaMessageHandler extends MessageHandler implements Runnable {
     
     private volatile boolean shutdownFlag = false;
 
-    public KafkaMessageHandler(MessageHandlerContainer parent, Object handler, Method m, HandleMessage config) {
+    public KafkaMessageProcessorHandler(MessageProcessorHandlerContainer parent, Object handler, Method m, HandleMessage config) {
         super(handler, m, parent, config);
         
         // Sort out inputs
-        this.parent = parent;
-        this.handler = handler;
-        this.handlerMethod = m;
         inputStreamName = ContainerUtils.resolve(config.configSource(), config.inputName());
         inputGroupName = config.inputGroupName();
         logger.info("Using handler input stream: " + inputStreamName + "[" + inputGroupName + "]");

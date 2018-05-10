@@ -1,9 +1,9 @@
 package com.redhat.processor.container;
 
-import com.redhat.processor.container.kafka.KafkaMessageHandler;
+import com.redhat.processor.StreamingContainer;
+import com.redhat.processor.container.kafka.KafkaMessageProcessorHandler;
 import com.redhat.processor.annotations.HandleMessage;
 import com.redhat.processor.annotations.MessageProcessor;
-import com.redhat.processor.annotations.SourceType;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -14,16 +14,14 @@ import java.util.logging.Logger;
  * Holds a message processor and finds queues etc
  * @author hhiden
  */
-public class MessageHandlerContainer {
-    private static final Logger logger = Logger.getLogger(MessageHandlerContainer.class.getName());
-    private Object processorObject;
+public class MessageProcessorHandlerContainer extends StreamingContainer {
+    private static final Logger logger = Logger.getLogger(MessageProcessorHandlerContainer.class.getName());
     
-    private HashMap<String, MessageHandler> handlerMap = new HashMap<>();
-    private String serverName;
-    private int serverPort;
+    
+    private HashMap<String, MessageProcessorHandler> handlerMap = new HashMap<>();
 
-    public MessageHandlerContainer(Object processorObject) {
-        this.processorObject = processorObject;
+    public MessageProcessorHandlerContainer(Object processorObject) {
+        super(processorObject);
         configureProcessor();
     }
     
@@ -51,26 +49,19 @@ public class MessageHandlerContainer {
                 if(m.getAnnotation(HandleMessage.class)!=null){
                     logger.info("Found handler method: " + m.getName());                    
                     HandleMessage hma = (HandleMessage)m.getAnnotation(HandleMessage.class);
-                    KafkaMessageHandler handler = new KafkaMessageHandler(this, processorObject, m, hma);
+                    KafkaMessageProcessorHandler handler = new KafkaMessageProcessorHandler(this, processorObject, m, hma);
                     handlerMap.put(hma.inputName(), handler);
                 }
             }
         }
     }
 
-    public String getServerName() {
-        return serverName;
-    }
-
-    public int getServerPort() {
-        return serverPort;
-    }
-    
     /**
      * Connect queues and start to receive messages
      */
+    @Override
     public void start(){
-        for(MessageHandler h : handlerMap.values()){
+        for(MessageProcessorHandler h : handlerMap.values()){
             new Thread(h).start();
         }
     }
@@ -78,8 +69,9 @@ public class MessageHandlerContainer {
     /**
      * Disconnect everything and stop messages
      */
+    @Override
     public void shutdown(){
-        for(MessageHandler h : handlerMap.values()){
+        for(MessageProcessorHandler h : handlerMap.values()){
             h.shutdown();
         }
     }

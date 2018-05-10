@@ -8,13 +8,13 @@ import java.lang.reflect.Method;
  * to a method and the retrieval of results for propagation to a new stream
  * @author hhiden
  */
-public abstract class MessageHandler implements Runnable {
+public abstract class MessageProcessorHandler implements Runnable {
     protected Object handler;
     protected Method handlerMethod;    
-    protected MessageHandlerContainer parent;
+    protected MessageProcessorHandlerContainer parent;
     protected HandleMessage config;
     
-    public MessageHandler(Object handler, Method handlerMethod, MessageHandlerContainer parent, HandleMessage config) {
+    public MessageProcessorHandler(Object handler, Method handlerMethod, MessageProcessorHandlerContainer parent, HandleMessage config) {
         this.handler = handler;
         this.handlerMethod = handlerMethod;
         this.parent = parent;
