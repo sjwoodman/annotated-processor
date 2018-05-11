@@ -43,6 +43,9 @@ public class MessageProcessorHandlerContainer extends StreamingContainer {
                 logger.warning("Using defaults for messaging service");
             }
             
+            // Populate parameters
+            ContainerUtils.populateFields(processorObject);
+            
             // Find the processor message handler
             Method[] methods = pClass.getDeclaredMethods();
             for(Method m : methods){

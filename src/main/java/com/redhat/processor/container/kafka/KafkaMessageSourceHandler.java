@@ -18,6 +18,7 @@ import javax.json.JsonObject;
 import org.aerogear.kafka.serialization.JsonObjectSerializer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.serialization.StringSerializer;
 
 /**
  * Kafka implementation of a message source handler
@@ -31,7 +32,7 @@ public class KafkaMessageSourceHandler extends MessageSourceHandler {
     private int interval;
     
     private volatile boolean shutdownFlag = false;
-    private Producer<Long, JsonObject> outputProducer;
+    private Producer<String, JsonObject> outputProducer;
     
     public KafkaMessageSourceHandler(Object handler, Method handlerMethod, MessageSourceHandlerContainer parent, ProduceMessage config) {
         super(handler, handlerMethod, parent, config);
@@ -44,12 +45,12 @@ public class KafkaMessageSourceHandler extends MessageSourceHandler {
     }
 
     /** Create a Kafka producer for a queue */
-    private Producer<Long, JsonObject> createProducer(String groupName) {
+    private Producer<String, JsonObject> createProducer(String groupName) {
         logger.info("Creating Kafka producer with ClientID: " + groupName);
         Properties props = new Properties();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, parent.getServerName() + ":" + parent.getServerPort());
         props.put(ProducerConfig.CLIENT_ID_CONFIG, groupName);
-        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, LongSerializer.class.getName());
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonObjectSerializer.class.getName());
         
         return new KafkaProducer<>(props);
@@ -70,7 +71,7 @@ public class KafkaMessageSourceHandler extends MessageSourceHandler {
             try {
                  final Object result = handlerMethod.invoke(handler);
                  if(result instanceof JsonObject){
-                    ProducerRecord<Long, JsonObject> outputRecord = new ProducerRecord<>(outputStreamName, System.nanoTime(), (JsonObject)result);
+                    ProducerRecord<String, JsonObject> outputRecord = new ProducerRecord<>(outputStreamName, Long.toString(System.nanoTime()), (JsonObject)result);
                     RecordMetadata metadata = outputProducer.send(outputRecord).get();                 
                  }
             } catch (Exception e){

@@ -23,10 +23,10 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
-import org.apache.kafka.common.serialization.ByteArrayDeserializer;
-import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.LongDeserializer;
 import org.apache.kafka.common.serialization.LongSerializer;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
 
 /**
  * This class handles messages for a single stream in a processor class
@@ -41,8 +41,8 @@ public class KafkaMessageProcessorHandler extends MessageProcessorHandler implem
     private final String inputGroupName;
     private final String outputClientId;
 
-    private Consumer<Long, JsonObject> inputConsumer;
-    private Producer<Long, JsonObject> outputProducer;
+    private Consumer<String, JsonObject> inputConsumer;
+    private Producer<String, JsonObject> outputProducer;
     
     private volatile boolean shutdownFlag = false;
 
@@ -77,25 +77,25 @@ public class KafkaMessageProcessorHandler extends MessageProcessorHandler implem
         }
     }
     /** Create a Kafka consumer attached to a queue */
-    private Consumer<Long, JsonObject> createConsumer(String groupName, String topicName) {
+    private Consumer<String, JsonObject> createConsumer(String groupName, String topicName) {
         logger.info("Creating Kafka consumer for Topic: " + topicName);
         Properties props = new Properties();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, parent.getServerName() + ":" + parent.getServerPort());
         props.put(ConsumerConfig.GROUP_ID_CONFIG, groupName);
-        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, LongDeserializer.class.getName());
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonObjectDeserializer.class.getName());
-        Consumer<Long, JsonObject> consumer = new KafkaConsumer<>(props);
+        Consumer<String, JsonObject> consumer = new KafkaConsumer<>(props);
         consumer.subscribe(Collections.singletonList(topicName));
         return consumer;
     }
     
     /** Create a Kafka producer for a queue */
-    private Producer<Long, JsonObject> createProducer(String groupName) {
+    private Producer<String, JsonObject> createProducer(String groupName) {
         logger.info("Creating Kafka producer with ClientID: " + groupName);
         Properties props = new Properties();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, parent.getServerName() + ":" + parent.getServerPort());
         props.put(ProducerConfig.CLIENT_ID_CONFIG, groupName);
-        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, LongSerializer.class.getName());
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonObjectSerializer.class.getName());
         
         return new KafkaProducer<>(props);
@@ -115,11 +115,11 @@ public class KafkaMessageProcessorHandler extends MessageProcessorHandler implem
         }        
         while(!shutdownFlag){
             // Consume messages
-            final ConsumerRecords<Long, JsonObject> consumerRecords
+            final ConsumerRecords<String, JsonObject> consumerRecords
                     = inputConsumer.poll(1);
 
             // Send each one through the message
-            for(ConsumerRecord<Long, JsonObject> record : consumerRecords){
+            for(ConsumerRecord<String, JsonObject> record : consumerRecords){
                 try {
                     if(outputStreamPresent){
                         // Retrieve the output
@@ -128,13 +128,11 @@ public class KafkaMessageProcessorHandler extends MessageProcessorHandler implem
                         // Push back to the stream
                         if(returnData instanceof JsonObject){
 
-                            ProducerRecord<Long, JsonObject> outputRecord = new ProducerRecord<>(outputStreamName, System.nanoTime(), (JsonObject)returnData);
+                            ProducerRecord<String, JsonObject> outputRecord = new ProducerRecord<>(outputStreamName, Long.toString(System.nanoTime()), (JsonObject)returnData);
 
                             RecordMetadata metadata = outputProducer.send(outputRecord).get();
-                            logger.info("Sent:" + metadata.toString());
-                        } else {
-                            logger.info("Processor did not create a message");
                         }
+                    
                     } else {
                         // Ignore the output
                         handlerMethod.invoke(handler, record.value());

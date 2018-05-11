@@ -29,7 +29,7 @@ public class MessageSourceHandlerContainer extends StreamingContainer {
             logger.info("Configuring message source for object: " + processorObject.getClass().getName());
             // Messaging system setup
             Class pClass = processorObject.getClass();
-            Annotation[] annotations = pClass.getAnnotationsByType(MessageProcessor.class);
+            Annotation[] annotations = pClass.getAnnotationsByType(MessageSource.class);
             if(annotations.length==1){
                 MessageSource msa = (MessageSource)annotations[0];
                 serverName = ContainerUtils.resolve(msa.configSource(), msa.serverName());
@@ -41,6 +41,9 @@ public class MessageSourceHandlerContainer extends StreamingContainer {
                 serverPort = 9092;
                 logger.warning("Using defaults for messaging service");
             }        
+            
+            // Populate parameters
+            ContainerUtils.populateFields(processorObject);
             
             // Source methods
             Method[] methods = pClass.getDeclaredMethods();
