@@ -14,6 +14,8 @@ import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.LongSerializer;
 import com.redhat.processor.annotations.ProduceMessage;
 import java.util.logging.Level;
+import javax.json.JsonObject;
+import org.aerogear.kafka.serialization.JsonObjectSerializer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 
@@ -29,7 +31,7 @@ public class KafkaMessageSourceHandler extends MessageSourceHandler {
     private int interval;
     
     private volatile boolean shutdownFlag = false;
-    private Producer<Long, byte[]> outputProducer;
+    private Producer<Long, JsonObject> outputProducer;
     
     public KafkaMessageSourceHandler(Object handler, Method handlerMethod, MessageSourceHandlerContainer parent, ProduceMessage config) {
         super(handler, handlerMethod, parent, config);
@@ -42,13 +44,13 @@ public class KafkaMessageSourceHandler extends MessageSourceHandler {
     }
 
     /** Create a Kafka producer for a queue */
-    private Producer<Long, byte[]> createProducer(String groupName) {
+    private Producer<Long, JsonObject> createProducer(String groupName) {
         logger.info("Creating Kafka producer with ClientID: " + groupName);
         Properties props = new Properties();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, parent.getServerName() + ":" + parent.getServerPort());
         props.put(ProducerConfig.CLIENT_ID_CONFIG, groupName);
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, LongSerializer.class.getName());
-        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonObjectSerializer.class.getName());
         
         return new KafkaProducer<>(props);
     }       
@@ -67,9 +69,8 @@ public class KafkaMessageSourceHandler extends MessageSourceHandler {
         while(!shutdownFlag){
             try {
                  final Object result = handlerMethod.invoke(handler);
-                 if(result!=null){
-                    byte[] returnByteData = ContainerUtils.serialize(result);
-                    ProducerRecord<Long, byte[]> outputRecord = new ProducerRecord<>(outputStreamName, System.nanoTime(), returnByteData);
+                 if(result instanceof JsonObject){
+                    ProducerRecord<Long, JsonObject> outputRecord = new ProducerRecord<>(outputStreamName, System.nanoTime(), (JsonObject)result);
                     RecordMetadata metadata = outputProducer.send(outputRecord).get();                 
                  }
             } catch (Exception e){

@@ -10,8 +10,9 @@ import java.util.Collections;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.apache.kafka.clients.admin.AdminClient;
-import org.apache.kafka.clients.admin.AdminClientConfig;
+import javax.json.JsonObject;
+import org.aerogear.kafka.serialization.JsonObjectDeserializer;
+import org.aerogear.kafka.serialization.JsonObjectSerializer;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -40,8 +41,8 @@ public class KafkaMessageProcessorHandler extends MessageProcessorHandler implem
     private final String inputGroupName;
     private final String outputClientId;
 
-    private Consumer<Long, byte[]> inputConsumer;
-    private Producer<Long, byte[]> outputProducer;
+    private Consumer<Long, JsonObject> inputConsumer;
+    private Producer<Long, JsonObject> outputProducer;
     
     private volatile boolean shutdownFlag = false;
 
@@ -76,26 +77,26 @@ public class KafkaMessageProcessorHandler extends MessageProcessorHandler implem
         }
     }
     /** Create a Kafka consumer attached to a queue */
-    private Consumer<Long, byte[]> createConsumer(String groupName, String topicName) {
+    private Consumer<Long, JsonObject> createConsumer(String groupName, String topicName) {
         logger.info("Creating Kafka consumer for Topic: " + topicName);
         Properties props = new Properties();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, parent.getServerName() + ":" + parent.getServerPort());
         props.put(ConsumerConfig.GROUP_ID_CONFIG, groupName);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, LongDeserializer.class.getName());
-        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
-        Consumer<Long, byte[]> consumer = new KafkaConsumer<>(props);
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonObjectDeserializer.class.getName());
+        Consumer<Long, JsonObject> consumer = new KafkaConsumer<>(props);
         consumer.subscribe(Collections.singletonList(topicName));
         return consumer;
     }
     
     /** Create a Kafka producer for a queue */
-    private Producer<Long, byte[]> createProducer(String groupName) {
+    private Producer<Long, JsonObject> createProducer(String groupName) {
         logger.info("Creating Kafka producer with ClientID: " + groupName);
         Properties props = new Properties();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, parent.getServerName() + ":" + parent.getServerPort());
         props.put(ProducerConfig.CLIENT_ID_CONFIG, groupName);
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, LongSerializer.class.getName());
-        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonObjectSerializer.class.getName());
         
         return new KafkaProducer<>(props);
     }   
@@ -114,22 +115,20 @@ public class KafkaMessageProcessorHandler extends MessageProcessorHandler implem
         }        
         while(!shutdownFlag){
             // Consume messages
-            final ConsumerRecords<Long, byte[]> consumerRecords
+            final ConsumerRecords<Long, JsonObject> consumerRecords
                     = inputConsumer.poll(1);
 
             // Send each one through the message
-            for(ConsumerRecord<Long, byte[]> record : consumerRecords){
+            for(ConsumerRecord<Long, JsonObject> record : consumerRecords){
                 try {
-                    Object callData = ContainerUtils.deserialize(record.value());
                     if(outputStreamPresent){
                         // Retrieve the output
-                        Object returnData = handlerMethod.invoke(handler, callData);
+                        Object returnData = handlerMethod.invoke(handler, record.value());
                         
                         // Push back to the stream
-                        if(returnData!=null){
-                            byte[] returnByteData = ContainerUtils.serialize(returnData);
+                        if(returnData instanceof JsonObject){
 
-                            ProducerRecord<Long, byte[]> outputRecord = new ProducerRecord<>(outputStreamName, System.nanoTime(), returnByteData);
+                            ProducerRecord<Long, JsonObject> outputRecord = new ProducerRecord<>(outputStreamName, System.nanoTime(), (JsonObject)returnData);
 
                             RecordMetadata metadata = outputProducer.send(outputRecord).get();
                             logger.info("Sent:" + metadata.toString());
@@ -138,8 +137,7 @@ public class KafkaMessageProcessorHandler extends MessageProcessorHandler implem
                         }
                     } else {
                         // Ignore the output
-                        handlerMethod.invoke(handler, callData);
-                        
+                        handlerMethod.invoke(handler, record.value());
                     }
                 } catch (Exception e){
                     logger.log(Level.SEVERE, "Error running method", e);

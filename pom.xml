@@ -31,5 +31,19 @@
             <version>1.7.25</version>
             <type>jar</type>
         </dependency>
+        
+        <dependency>
+            <groupId>org.aerogear.kafka</groupId>
+            <artifactId>kafka-cdi-extension</artifactId>
+            <version>0.0.10</version>
+            <type>jar</type>
+        </dependency>
+        
+        <dependency>
+            <groupId>org.glassfish</groupId>
+            <artifactId>javax.json</artifactId>
+            <version>1.0.3</version>
+            <type>jar</type>
+        </dependency>        
     </dependencies>
 </project>
